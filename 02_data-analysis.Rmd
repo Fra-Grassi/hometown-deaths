@@ -1,0 +1,149 @@
+---
+title: "02_data-analysis"
+author: "Francesco Grassi"
+date: "2022-10-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Aim
+
+Exploratory analysis of the dataset containing the number of deaths in my hometown in the period 01/01/2011 - 31/07/2022.  
+Raw data was cleaned and prepared in script "01_clean-data.Rmd" (see script for details).
+
+# Libraries
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+# Load data
+
+Cleaned data is stored in the .csv file "clean-data.csv", in "data/".  
+Dataset contains one row for each death(s) recorded in a give day in the period 01/01/2011 - 31/07/2022. Dataset columns are:
+
+- Age_Range: age range of the deceased
+- Date: date of death in format gg-mm-yy
+- Sex: M = male, F = female
+- Count: number of deaths recorder in the given day
+
+```{r}
+main <- read_csv(file = "data/clean-data.csv")
+
+head(main)  # Have a look at first rows
+```
+
+# Descriptive analysis
+
+Before start checking whether the saying that "people in the hometown die in groups of three", it's interesting to get a general idea of the data.set we're working with.
+
+- Table and plot of deaths per year, divided by sex
+- Table and plot of deaths per month, divided by sex
+- Table and plot of deaths per age range, divided by sex
+- Plot time-series of deaths per month in the years
+
+## Refine data.frame
+
+I know it's probably unnecessary and inelegant, but I hate the way lubridate treats dates when grouping and summarizing (as will be done in next steps). So for my peace of mind, first of all I'm going to add two new variables to the data.frame, "Month" and "Year", and use them for further grouping steps:
+```{r}
+
+main <- main %>% 
+  mutate(Month = ordered(month(Date, label = TRUE, abbr = TRUE)),
+         Year = ordered(year(Date)))
+
+```
+
+
+## Deaths per year
+
+Summary table:
+```{r}
+
+main %>% 
+  group_by(Year, Sex) %>% 
+  summarize(Count = n())
+
+```
+
+Plot table data as grouped barplot:
+```{r, fig.width=4, fig.height=2}
+
+p <- main %>% 
+  ggplot(aes(x = Year, fill = Sex))
+
+p <- p +
+  geom_bar(position = "dodge2") +
+  labs(x = "Year", y = "Number of deaths", fill = "Sex") +
+  ggtitle("Number of deaths by sex\nin the period 2011-2022") +
+  scale_fill_brewer(labels = c("Female", "Male"), palette = "Dark2") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 15),
+        plot.title = element_text(size = 20))
+
+p
+
+```
+
+As we can see, the year with the smallest number of death was 2013 for females, and 2018 for males. The deadliest year was instead 2020 for female, and 2011 for males.
+
+## Deaths per month
+
+Summary table:
+```{r}
+
+main %>% 
+  group_by(Month, Sex) %>% 
+  summarize(Count = n())
+
+```
+
+Plot table data as grouped barplot: 
+```{r, fig.width=4, fig.height=2}
+
+p <- main %>% 
+  ggplot(aes(x = Month, fill = Sex))
+
+p <- p +
+  geom_bar(position = "dodge2") +
+  labs(x = "Month", y = "Number of deaths", fill = "Sex") +
+  ggtitle("Monthly number of deaths by sex") +
+  scale_fill_brewer(labels = c("Female", "Male"), palette = "Dark2") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 15),
+        plot.title = element_text(size = 20))
+
+p
+
+```
+
+Here we can see what it looks like two peaks of mortality across the year: one in the winter months (roughly Nov-Feb), and one in the summer months (roughly Jun-Aug).
+
+```{r}
+a <- main %>% 
+  arrange(Date)
+
+b <- a %>% 
+  mutate(distance = day(as.period(interval(lag(Date), Date)))) %>% 
+  drop_na()
+
+
+p <- b %>% 
+  ggplot(aes(x = distance, color = Sex))
+
+p <- p +
+  geom_histogram(binwidth = 1) +
+  scale_color_brewer(labels = c("Female", "Male"), palette = "Dark2")
+  
+
+p
+```
+

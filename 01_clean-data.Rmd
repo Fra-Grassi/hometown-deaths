@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 This script cleans up the file containing raw data about deaths in the hometown.  
 
 The file comes from: https://www.istat.it/storage/dati_mortalita/decessi-comunali-giornalieri-regioni(excel)-21-07-2022-5.zip  
-The link downloads a .zip folder with an .xlsx file for each Italian region. Each file contains data regarding the dealy number of deaths in each town of the region in the period 01/01/2011 - 31/07/2022.  
+The link downloads a .zip folder with an .xlsx file for each Italian region. Each file contains data regarding the daily number of deaths in each town of the region in the period 01/01/2011 - 31/07/2022.  
 The file of interest is "comuni_giornaliero_31luglio2022_Puglia.xlsx", which has been renamed in this project as "raw_all-region".
 
 The file contains the following variables:
@@ -50,7 +50,7 @@ The file contains the following variables:
   + 20: 95-99 
   + 21: 100+
 - GE: day of death (MM/DD)
-- Many columns with name structure "GENDER_YY", indicating number of deaths for a given GENDER ("M": Male; "F": Female, "T": Total) for the year YY (range: 2011-2022)
+- Many columns with name structure "SEX_YY", indicating number of deaths for a given SEX ("M": Male; "F": Female, "T": Total) for the year YY (range: 2011-2022)
 
 # Libraries
 ```{r}
@@ -86,14 +86,14 @@ raw_data <- raw_data %>%
 
 While column "GE" contains the day and month of decease, the year is stored in the variable name of the death counts columns. In order to obtain a proper date variable:
 
-- Convert data.frame to long format, splitting death count variable names in "Gender" and "Year"
+- Convert data.frame to long format, splitting death count variable names in "Sex" and "Year"
 - Combine "GE" and "Year" into one variable and convert to date format
 
 ```{r}
 
 raw_data_long <- raw_data %>% 
   pivot_longer(!c(CL_ETA, GE),
-               names_to = c("Gender", "Year"),
+               names_to = c("Sex", "Year"),
                names_sep = "_",
                values_to = "Count") %>% 
   unite("Date", GE, Year, sep = "-") %>% 
