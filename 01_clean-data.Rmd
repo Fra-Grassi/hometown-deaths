@@ -1,0 +1,145 @@
+---
+title: "01_clean-data"
+author: "Francesco Grassi"
+date: "2022-10-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Aim
+
+This script cleans up the file containing raw data about deaths in the hometown.  
+
+The file comes from: https://www.istat.it/storage/dati_mortalita/decessi-comunali-giornalieri-regioni(excel)-21-07-2022-5.zip  
+The link downloads a .zip folder with an .xlsx file for each Italian region. Each file contains data regarding the dealy number of deaths in each town of the region in the period 01/01/2011 - 31/07/2022.  
+The file of interest is "comuni_giornaliero_31luglio2022_Puglia.xlsx", which has been renamed in this project as "raw_all-region".
+
+The file contains the following variables:
+
+- REG: Code indicating Italian Region
+- PROV: Code indicating Italian Province within Region
+- NOME_REGIONE: Name of the Region
+- NOME_PROVINCIA: Name of the Province
+- NOME_COMUNE: Name of the city/town
+- COD_PROVCOM: Code indicating the city/town
+- TIPO_COMUNE: 1 if data is available for the entire assessment period; 2 if data from 2022 is missing
+- CL_ETA: Age range of the deceased person
+  + 0: 0 
+  + 1: 1-4 
+  + 2: 5-9
+  + 3: 10-14 
+  + 4: 15-19 
+  + 5: 20-24 
+  + 6: 25-29 
+  + 7: 30-34 
+  + 8: 35-39 
+  + 9: 40-44 
+  + 10: 45-49 
+  + 11: 50-54 
+  + 12: 55-59 
+  + 13: 60-64 
+  + 14: 65-69 
+  + 15: 70-74 
+  + 16: 75-79 
+  + 17: 80-84 
+  + 18: 85-89 
+  + 19: 90-94 
+  + 20: 95-99 
+  + 21: 100+
+- GE: day of death (MM/DD)
+- Many columns with name structure "GENDER_YY", indicating number of deaths for a given GENDER ("M": Male; "F": Female, "T": Total) for the year YY (range: 2011-2022)
+
+# Libraries
+```{r}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+```
+
+
+# First cleaning
+
+- Load raw data
+- Select only the town of "Castelluccio dei Sauri"
+- Get rid of all Region/Province names and codes, as well as "Total" death count columns
+- Convert variable "GE" in date format "%d-%m"
+- Replace "n.d." in death counts with NAs
+- Convert death counts columns to numeric
+
+```{r}
+
+raw_data <- read_excel(path = "data/raw_all-region.xlsx", trim_ws = TRUE)
+
+raw_data <- raw_data %>% 
+  filter(NOME_COMUNE == "Castelluccio dei Sauri") %>% 
+  select(!c(REG:TIPO_COMUNE, starts_with("T_"))) %>% 
+  mutate(GE = format(as.Date(GE, format = "%m%d"), "%d-%m")) %>% 
+  na_if("n.d.") %>% 
+  mutate_at(vars(-CL_ETA, -GE), as.numeric)
+
+```
+
+# Deal with Dates
+
+While column "GE" contains the day and month of decease, the year is stored in the variable name of the death counts columns. In order to obtain a proper date variable:
+
+- Convert data.frame to long format, splitting death count variable names in "Gender" and "Year"
+- Combine "GE" and "Year" into one variable and convert to date format
+
+```{r}
+
+raw_data_long <- raw_data %>% 
+  pivot_longer(!c(CL_ETA, GE),
+               names_to = c("Gender", "Year"),
+               names_sep = "_",
+               values_to = "Count") %>% 
+  unite("Date", GE, Year, sep = "-") %>% 
+  mutate(Date = dmy(Date))
+
+```
+
+# Final cleaning
+
+- Remove rows with no death (0 or NAs in "Count")
+- Replace "CL_ETA" with corresponding age range
+- Rename variables
+- Save final data.frame
+
+```{r}
+
+raw_data_long <- raw_data_long %>%
+  filter(Count > 0) %>%
+  mutate(CL_ETA = recode(CL_ETA,
+    `0` = "0",
+    `1` = "1-4",
+    `2` = "5-9",
+    `3` = "10-14",
+    `4` = "15-19",
+    `5` = "20-24",
+    `6` = "25-29",
+    `7` = "30-34",
+    `8` = "35-39",
+    `9` = "40-44",
+    `10` = "45-49",
+    `11` = "50-54",
+    `12` = "55-59",
+    `13` = "60-64",
+    `14` = "65-69",
+    `15` = "70-74",
+    `16` = "75-79",
+    `17` = "80-84",
+    `18` = "85-89",
+    `19` = "90-94",
+    `20` = "95-99",
+    `21` = "100+"
+  )) %>% 
+  rename(Age_Range = CL_ETA)
+  
+write_csv(raw_data_long, file = "data/clean-data.csv")
+
+```
+
+
