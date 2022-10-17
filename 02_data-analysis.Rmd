@@ -9,8 +9,8 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
-                      fig.width = 7,
-                      fig.height = 5)
+                      fig.width = 8,
+                      fig.height = 6)
 ```
 
 # Aim
@@ -86,13 +86,14 @@ p <- main %>%
 p <- p +
   geom_bar(position = "dodge2") +
   labs(x = "Year", y = "Number of deaths", fill = "Sex") +
-  ggtitle("Number of deaths by sex\nin the period 2011-2022") +
+  ggtitle("Number of deaths by sex in the period 2011-2022") +
   scale_fill_brewer(labels = c("Female", "Male"), palette = "Dark2") +
   theme_minimal() +
   theme(axis.text = element_text(size = 10),
         axis.title = element_text(size = 15),
         legend.text = element_text(size = 10),
         legend.title = element_text(size = 15),
+        legend.position = "top",
         plot.title = element_text(size = 20))
 
 p
@@ -128,6 +129,7 @@ p <- p +
         axis.title = element_text(size = 15),
         legend.text = element_text(size = 10),
         legend.title = element_text(size = 15),
+        legend.position = "top",
         plot.title = element_text(size = 20))
 
 p
@@ -164,6 +166,7 @@ p <- p +
         axis.title = element_text(size = 15),
         legend.text = element_text(size = 10),
         legend.title = element_text(size = 15),
+        legend.position = "top",
         plot.title = element_text(size = 20))
 
 p
@@ -172,24 +175,107 @@ p
 
 As probably expected, the distribution of deaths by age is clearly skewed toward old ages.
 
-# 
+# Main question: death distribution
+
+Time to move to the main point of this analysis: understanding whether there is any truth in my old town's saying that "people always die in groups of three".
+
+One approach might be to calculate, for each entry in the main data.frame, the interval in days between the previous and the following death (i.e. calculating the interval in days between every second entry in the data.frame). We can then plot the distribution of these calculated intervals.  
+If deaths happen randomly with no correlation with each other, their distribution should be flat. If instead there is any truth behind the saying, we should see a peak in the lower range of the distribution, indicating that short intervals between three deaths are more common than longer ones.
+
+We can calculate this interval by using dplyr function lag(), which will move values in our Date column of a given number of places. We can then subtract this lagged version from the original Date to calculate the interval in days:
 ```{r}
-a <- main %>% 
-  arrange(Date)
-
-b <- a %>% 
-  mutate(distance = day(as.period(interval(lag(Date), Date)))) %>% 
-  drop_na()
-
-
-p <- b %>% 
-  ggplot(aes(x = distance, color = Sex))
-
-p <- p +
-  geom_histogram(binwidth = 1) +
-  scale_color_brewer(labels = c("Female", "Male"), palette = "Dark2")
-  
-
-p
+lagged <- main %>% 
+  arrange(Date) %>% 
+  mutate(Days_Interval = day(  # Extract only days
+    as.period(  # Convert interval to period
+      interval(  # Calculate time interval
+        dplyr::lag(Date, n = 2), Date)))) %>% 
+  drop_na  # Remove empty entries created by lagging
 ```
 
+Now that we have calculated the interval in days between every second death, we can plot it as a histogram (personally I find frequency more informative than density when working with narrow range of values as in this case).
+```{r}
+
+p <- lagged %>% 
+  ggplot(aes(x = Days_Interval))
+
+p <- p +
+  geom_histogram(binwidth = 1, color = "black", fill = "gray90") +
+  labs(x = "Days", y = "Frequency") +
+  ggtitle("Frequency of intervals of days in which\nthree deaths occur") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15),
+        plot.title = element_text(size = 20))
+
+p
+
+```
+
+This already look interesting!  
+
+## Deat distribution by sex
+
+Just to have a deeper look, let's also divide the count per sex:
+```{r}
+
+p <- lagged %>% 
+  ggplot(aes(x = Days_Interval, color = Sex, fill = Sex))
+
+p <- p +
+  geom_histogram(binwidth = 1, alpha = 0.5) +
+  labs(x = "Days", y = "Frequency") +
+  ggtitle("Frequency of intervals of days in which\nthree deaths occur, by sex") +
+  scale_fill_brewer(labels = c("Female", "Male"), palette = "Dark2") +
+  scale_color_brewer(labels = c("Female", "Male"), palette = "Dark2") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15),
+        legend.position = "top",
+        plot.title = element_text(size = 20))
+
+p
+
+```
+
+## Death distribution by year
+
+Finally, it would also be interesting to check whether this distribution changed through the years. Maybe the old saying had once a base of truth? 
+
+In order to do so, let's plot again the same lagged intervals, but this time creating one sub-plot per year:
+
+```{r}
+
+p <- lagged %>% 
+  group_by(Year) %>% 
+  ggplot(aes(x = Days_Interval))
+
+p <- p +
+  geom_histogram(binwidth = 1, color = "black", fill = "gray90") +
+  facet_wrap(~ Year) +
+  labs(x = "Days", y = "Frequency") +
+  ggtitle("Yearly frequency of intervals of days in which\nthree deaths occur") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 15),
+        strip.text = element_text(size = 10),
+        plot.title = element_text(size = 20))
+
+p
+  
+  
+  
+```
+
+As we can see from the plots, there is some quite variation across the years. However, all plots show either a flat distribution of intervals, or a peak in the center (or sometimes even right!) region.
+
+# Conclusions
+
+This little project tried to investigate whether there was any truth behind the old saying from my hometown in south Italy that "people always die in groups of three".  
+While the spirit of the 'investigation' was quite ironical, I took this as a short exercise for me to work with time-series and open-access data.
+
+After playing with the data at hands, I think it is possible to provide an answer to the original question:
+
+> Data do not support the old saying that "people always die in groups of three" in my hometown.  
+Looking at the data in the period 2011-2022, it appears that three successive deaths can happen as easly in a short number of days, as in a longer interval, up to a month!  
+It remains interesting to understand why this saying originated in the first place. Older historical data would maybe help provide a more comprehensive picture. Unfortunately, at the moment it does not seem to be possible to retrieve data at this granular level dating before 2011.
