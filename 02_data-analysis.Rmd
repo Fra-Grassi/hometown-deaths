@@ -2,11 +2,15 @@
 title: "02_data-analysis"
 author: "Francesco Grassi"
 date: "2022-10-16"
-output: html_document
+output: 
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,
+                      fig.width = 7,
+                      fig.height = 5)
 ```
 
 # Aim
@@ -15,9 +19,14 @@ Exploratory analysis of the dataset containing the number of deaths in my hometo
 Raw data was cleaned and prepared in script "01_clean-data.Rmd" (see script for details).
 
 # Libraries
-```{r}
+```{r, message=FALSE}
+
+options(dplyr.summarise.inform = FALSE)
+options(dplyr.quiet = TRUE)
+
 library(tidyverse)
 library(lubridate)
+
 ```
 
 # Load data
@@ -30,7 +39,7 @@ Dataset contains one row for each death(s) recorded in a give day in the period 
 - Sex: M = male, F = female
 - Count: number of deaths recorder in the given day
 
-```{r}
+```{r, message=FALSE}
 main <- read_csv(file = "data/clean-data.csv")
 
 head(main)  # Have a look at first rows
@@ -43,19 +52,19 @@ Before start checking whether the saying that "people in the hometown die in gro
 - Table and plot of deaths per year, divided by sex
 - Table and plot of deaths per month, divided by sex
 - Table and plot of deaths per age range, divided by sex
-- Plot time-series of deaths per month in the years
 
 ## Refine data.frame
 
-I know it's probably unnecessary and inelegant, but I hate the way lubridate treats dates when grouping and summarizing (as will be done in next steps). So for my peace of mind, first of all I'm going to add two new variables to the data.frame, "Month" and "Year", and use them for further grouping steps:
+Mutate "Age_Range" in an ordered factor.  
+Moreover, I know it's probably unnecessary and inelegant, but I hate the way lubridate treats dates when grouping and summarizing (as will be done in next steps). So for my peace of mind, first of all I'm going to add two new variables to the data.frame, "Month" and "Year", and use them for further grouping steps:
 ```{r}
 
 main <- main %>% 
+  mutate(Age_Range = factor(Age_Range, levels = c("0", "40-44", "45-49", "50-54", "55-59", "60-64", "65-69", "70-74", "75-79", "80-84", "85-89", "90-94", "95-99", "100+"))) %>% 
   mutate(Month = ordered(month(Date, label = TRUE, abbr = TRUE)),
          Year = ordered(year(Date)))
 
 ```
-
 
 ## Deaths per year
 
@@ -69,7 +78,7 @@ main %>%
 ```
 
 Plot table data as grouped barplot:
-```{r, fig.width=4, fig.height=2}
+```{r}
 
 p <- main %>% 
   ggplot(aes(x = Year, fill = Sex))
@@ -104,7 +113,7 @@ main %>%
 ```
 
 Plot table data as grouped barplot: 
-```{r, fig.width=4, fig.height=2}
+```{r}
 
 p <- main %>% 
   ggplot(aes(x = Month, fill = Sex))
@@ -127,6 +136,43 @@ p
 
 Here we can see what it looks like two peaks of mortality across the year: one in the winter months (roughly Nov-Feb), and one in the summer months (roughly Jun-Aug).
 
+## Deaths per age range
+
+Summary table:
+```{r}
+
+main %>% 
+  group_by(Age_Range, Sex) %>% 
+  summarize(Count = n())
+
+```
+
+Plot table data as grouped barplot: 
+```{r}
+
+p <- main %>% 
+  ggplot(aes(x = Age_Range, fill = Sex))
+
+p <- p +
+  geom_bar(position = "dodge2") +
+  labs(x = "Age Range", y = "Number of deaths", fill = "Sex") +
+  ggtitle("Number of deaths by age range and sex") +
+  scale_fill_brewer(labels = c("Female", "Male"), palette = "Dark2") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 10),
+        axis.text.x = element_text(angle = -45),
+        axis.title = element_text(size = 15),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 15),
+        plot.title = element_text(size = 20))
+
+p
+
+```
+
+As probably expected, the distribution of deaths by age is clearly skewed toward old ages.
+
+# 
 ```{r}
 a <- main %>% 
   arrange(Date)
